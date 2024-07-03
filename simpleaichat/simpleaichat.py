@@ -57,23 +57,37 @@ class AIChat(BaseModel):
             new_default_session.title = character
             self.interactive_console(character=character, prime=prime)
 
+    @staticmethod
+    def get_api_key_env_var(model_name: str) -> str:
+        """Get the environment variable name for the API key based on the model name."""
+        model_api_key_env_vars = {
+            "gpt": "OPENAI_API_KEY",
+            "palm": "PALM_API_KEY",
+            "claude": "CLAUDE_API_KEY"
+        }
+        model_prefix = model_name.split("-")[0]
+        return model_api_key_env_vars.get(model_prefix, "CHAT_API_KEY")
+
     def new_session(
         self,
         return_session: bool = False,
         **kwargs,
     ) -> Optional[ChatGPTSession]:
-        if "model" not in kwargs:  # set default
-            kwargs["model"] = "gpt-3.5-turbo"
         # TODO: Add support for more models (PaLM, Claude)
-        if "gpt-" in kwargs["model"]:
-            gpt_api_key = kwargs.get("api_key") or os.getenv("OPENAI_API_KEY")
-            assert gpt_api_key, f"An API key for {kwargs['model'] } was not defined."
-            sess = ChatGPTSession(
-                auth={
-                    "api_key": gpt_api_key,
-                },
-                **kwargs,
-            )
+        kwargs.setdefault("model", "gpt-3.5-turbo")
+
+        api_key_env_var = self.get_api_key_env_var(kwargs["model"])
+        api_key = kwargs.get("api_key") or os.getenv(api_key_env_var)
+        assert api_key, f"An API key for {kwargs['model']} was not defined."
+
+        if "base_url" in kwargs:
+            kwargs["api_url"] = f"{kwargs['base_url']}/chat/completions"
+        sess = ChatGPTSession(
+            auth={
+                "api_key": api_key,
+            },
+            **kwargs,
+        )
 
         if return_session:
             return sess
